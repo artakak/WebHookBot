@@ -39,11 +39,9 @@ telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(API_TOKEN)
 
 app = flask.Flask(__name__)
-app.config['CELERY_BROKER_URL'] = 'redis://10.16.4.79:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'database'
-app.config['CELERY_RESULT_DBURI'] = 'sqlite:///temp.db'
-app.config['CELERY_TRACK_STARTED'] = True
-app.config['CELERY_SEND_EVENTS'] = True
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+
 
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
@@ -53,7 +51,9 @@ celery.conf.update(app.config)
 # Empty webserver index, return nothing, just http 200
 @app.route('/', methods=['GET', 'HEAD'])
 def index():
-    print bot.get_webhook_info()
+    print ("START")
+    test.apply_async()
+    #print bot.get_webhook_info()
     return ''
 
 
@@ -87,7 +87,8 @@ def send_letter(message):
 
 @celery.task
 def test():
-    time.sleep(50)
+    time.sleep(5)
+    print ("Finish")
 
 
 @celery.task
