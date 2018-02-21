@@ -5,7 +5,7 @@ import telebot
 import logging
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from PIL import Image
+#from PIL import Image
 import time
 import os
 from celery import Celery
@@ -16,8 +16,8 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 API_TOKEN = '548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno'
 
 WEBHOOK_HOST = 'fc823ddf.ngrok.io'
-WEBHOOK_PORT = 80  # 443, 80, 88 or 8443 (port need to be 'open')
-WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
+WEBHOOK_PORT = 5000  # 443, 80, 88 or 8443 (port need to be 'open')
+WEBHOOK_LISTEN = '127.0.0.1'  # In some VPS you may need to put here the IP addr
 
 WEBHOOK_SSL_CERT = "%s/YOURPUBLIC.pem" % dir_path  # Path to the ssl certificate
 WEBHOOK_SSL_PRIV = "%s/YOURPRIVATE.key" % dir_path # Path to the ssl private key
@@ -46,6 +46,40 @@ app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
+
+
+@celery.task
+def test():
+    time.sleep(5)
+    print ("Finish")
+
+
+@celery.task
+def on_site(message):
+    driver = webdriver.PhantomJS("%s/phantomjs.exe" % dir_path, service_args=['--ignore-ssl-errors=true'])
+    driver.set_window_size(1280, 1024)
+    driver.get("https://xn--90adear.xn--p1ai/request_main")
+    driver.find_element_by_xpath("//label[@class='checkbox']").click()
+    driver.find_element_by_xpath("//button[@class='u-form__sbt']").click()
+
+    driver.find_element_by_xpath("//select[@name='region_code']/option[text()='77 г. Москва']").click()
+    driver.find_element_by_xpath("//select[@name='subunit']/option[text()='Управление ГИБДД ГУ МВД России по г. Москве']").click()
+    driver.find_element_by_id("surname_check").send_keys(u"Фамилия")
+    driver.find_element_by_id("firstname_check").send_keys(u"Имя")
+    driver.find_element_by_id("email_check").send_keys("mail.nomail.com")
+    driver.find_element_by_id("phone_check").send_keys("+7925555555")
+    driver.find_element_by_name("message").send_keys(u"Обращение")
+
+    capcha = driver.find_element_by_xpath("//img[@class='captcha-img']")
+    get_captcha(driver, capcha, "%s/captcha.jpeg" % dir_path)
+
+    driver.find_element_by_name("captcha").send_keys("captcha")
+
+    driver.find_element_by_xpath("//a[@class='u-form__sbt']").click()
+    time.sleep(5)
+    driver.get_screenshot_as_file("%s/alt.png" % dir_path)
+
+    bot.reply_to(message, "Отправлено")
 
 
 # Empty webserver index, return nothing, just http 200
@@ -85,40 +119,6 @@ def send_letter(message):
     #on_site.delay(message)
 
 
-@celery.task
-def test():
-    time.sleep(5)
-    print ("Finish")
-
-
-@celery.task
-def on_site(message):
-    driver = webdriver.PhantomJS("%s/phantomjs.exe" % dir_path, service_args=['--ignore-ssl-errors=true'])
-    driver.set_window_size(1280, 1024)
-    driver.get("https://xn--90adear.xn--p1ai/request_main")
-    driver.find_element_by_xpath("//label[@class='checkbox']").click()
-    driver.find_element_by_xpath("//button[@class='u-form__sbt']").click()
-
-    driver.find_element_by_xpath("//select[@name='region_code']/option[text()='77 г. Москва']").click()
-    driver.find_element_by_xpath("//select[@name='subunit']/option[text()='Управление ГИБДД ГУ МВД России по г. Москве']").click()
-    driver.find_element_by_id("surname_check").send_keys(u"Фамилия")
-    driver.find_element_by_id("firstname_check").send_keys(u"Имя")
-    driver.find_element_by_id("email_check").send_keys("mail.nomail.com")
-    driver.find_element_by_id("phone_check").send_keys("+7925555555")
-    driver.find_element_by_name("message").send_keys(u"Обращение")
-
-    capcha = driver.find_element_by_xpath("//img[@class='captcha-img']")
-    get_captcha(driver, capcha, "%s/captcha.jpeg" % dir_path)
-
-    driver.find_element_by_name("captcha").send_keys("captcha")
-
-    driver.find_element_by_xpath("//a[@class='u-form__sbt']").click()
-    time.sleep(5)
-    driver.get_screenshot_as_file("%s/alt.png" % dir_path)
-
-    bot.reply_to(message, "Отправлено")
-
-
 # Handle all other messages
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def echo_message(message):
@@ -130,15 +130,15 @@ def get_captcha(driver, element, path):
     size = element.size
     driver.save_screenshot(path)
 
-    image = Image.open(path)
+    #image = Image.open(path)
 
     left = location['x']
     top = location['y']
     right = location['x'] + size['width']
     bottom = location['y'] + size['height']
 
-    image = image.crop((left, top, right, bottom))
-    image.save(path, 'jpeg')
+    #image = image.crop((left, top, right, bottom))
+    #image.save(path, 'jpeg')
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
@@ -147,11 +147,5 @@ def get_captcha(driver, element, path):
 # Set webhook
 #bot.set_webhook(url=WEBHOOK_URL_BASE+WEBHOOK_URL_PATH, certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
-# Start flask serverr
-app.run(host=WEBHOOK_LISTEN,
-        port=WEBHOOK_PORT,
-        #ssl_context=(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV),
-        debug=True)
-
-if __name__ == "__main__":
-    app.run()
+if __name__ == '__main__':
+    app.run(debug=True)
