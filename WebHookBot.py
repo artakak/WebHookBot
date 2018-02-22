@@ -15,8 +15,8 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 
 API_TOKEN = '548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno'
 
-WEBHOOK_HOST = 'fc823ddf.ngrok.io'
-WEBHOOK_PORT = 80  # 443, 80, 88 or 8443 (port need to be 'open')
+WEBHOOK_HOST = 'a3fd200f.ngrok.io'
+WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
 WEBHOOK_LISTEN = '127.0.0.1'  # In some VPS you may need to put here the IP addr
 
 WEBHOOK_SSL_CERT = "%s/YOURPUBLIC.pem" % dir_path  # Path to the ssl certificate
@@ -24,9 +24,9 @@ WEBHOOK_SSL_PRIV = "%s/YOURPRIVATE.key" % dir_path # Path to the ssl private key
 
 # Quick'n'dirty SSL certificate generation:
 #
-#openssl req -newkey rsa:2048 -sha256 -nodes -keyout YOURPRIVATE.key -x509 -days 365 -out YOURPUBLIC.pem -subj "/C=US/ST=New York/L=Brooklyn/O=Example Brooklyn Company/CN=fc823ddf.ngrok.io"
+#openssl req -newkey rsa:2048 -sha256 -nodes -keyout YOURPRIVATE.key -x509 -days 365 -out YOURPUBLIC.pem -subj "/C=US/ST=New York/L=Brooklyn/O=Example Brooklyn Company/CN=a3fd200f.ngrok.io"
 #
-#curl -F "url=https://fc823ddf.ngrok.io/548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno/" -F "certificate=YOURPUBLIC.pem" "https://api.telegram.org/bot548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno/setwebhook"
+#curl -F "url=https://a3fd200f.ngrok.io/548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno/" -F "certificate=YOURPUBLIC.pem" "https://api.telegram.org/bot548697540:AAHbO142Q-p98C0-uvqpvi2-eYnSd4RdWno/setwebhook"
 #
 
 WEBHOOK_URL_BASE = "https://%s" % (WEBHOOK_HOST)
@@ -39,8 +39,8 @@ telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(API_TOKEN)
 
 app = flask.Flask(__name__)
-app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+app.config['CELERY_BROKER_URL'] = 'amqp://localhost'
+app.config['CELERY_RESULT_BACKEND'] = 'amqp://localhost'
 
 
 # Initialize Celery
@@ -49,14 +49,9 @@ celery.conf.update(app.config)
 
 
 @celery.task
-def test():
-    time.sleep(5)
-    print ("Finish")
-
-
-@celery.task
 def on_site(message):
-    driver = webdriver.PhantomJS("%s/phantomjs.exe" % dir_path, service_args=['--ignore-ssl-errors=true'])
+    time.sleep(10)
+    """driver = webdriver.PhantomJS("%s/phantomjs.exe" % dir_path, service_args=['--ignore-ssl-errors=true'])
     driver.set_window_size(1280, 1024)
     driver.get("https://xn--90adear.xn--p1ai/request_main")
     driver.find_element_by_xpath("//label[@class='checkbox']").click()
@@ -77,7 +72,7 @@ def on_site(message):
 
     driver.find_element_by_xpath("//a[@class='u-form__sbt']").click()
     time.sleep(5)
-    driver.get_screenshot_as_file("%s/alt.png" % dir_path)
+    driver.get_screenshot_as_file("%s/alt.png" % dir_path)"""
 
     bot.reply_to(message, "Отправлено")
 
@@ -85,8 +80,6 @@ def on_site(message):
 # Empty webserver index, return nothing, just http 200
 @app.route('/', methods=['GET', 'HEAD'])
 def index():
-    print ("START")
-    test.apply_async()
     #print bot.get_webhook_info()
     return ''
 
@@ -115,7 +108,7 @@ def send_welcome(message):
 @bot.message_handler(commands=['send'])
 def send_letter(message):
     bot.reply_to(message, "Обрабатывается")
-    test.apply_async(countdown=10)
+    on_site.delay(message)
     #on_site.delay(message)
 
 
@@ -130,15 +123,15 @@ def get_captcha(driver, element, path):
     size = element.size
     driver.save_screenshot(path)
 
-    #image = Image.open(path)
+    image = Image.open(path)
 
     left = location['x']
     top = location['y']
     right = location['x'] + size['width']
     bottom = location['y'] + size['height']
 
-    #image = image.crop((left, top, right, bottom))
-    #image.save(path, 'jpeg')
+    image = image.crop((left, top, right, bottom))
+    image.save(path, 'jpeg')
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
